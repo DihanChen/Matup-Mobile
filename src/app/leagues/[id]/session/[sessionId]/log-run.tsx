@@ -14,6 +14,14 @@ import { supabase } from "@/lib/supabase";
 import { getApiBaseUrl } from "@/lib/api";
 import { Colors } from "@/constants/colors";
 import { ErrorState } from "@/components/ui";
+import {
+  RUN_TIME_LABEL,
+  RUN_DISTANCE_LABEL,
+  RUN_DISTANCE_PLACEHOLDER,
+  ERROR_RUN_TIME_REQUIRED,
+  ERROR_RUN_DISTANCE_INVALID,
+  ERROR_RUN_NETWORK,
+} from "@/lib/result-submission-strings";
 
 export default function LogRunScreen() {
   const { id, sessionId } = useLocalSearchParams<{ id: string; sessionId: string }>();
@@ -38,11 +46,11 @@ export default function LogRunScreen() {
     const dist = parseInt(distanceMeters, 10) || 0;
 
     if (totalSeconds <= 0) {
-      setValidationMsg("Please enter your finish time.");
+      setValidationMsg(ERROR_RUN_TIME_REQUIRED);
       return;
     }
     if (dist <= 0) {
-      setValidationMsg("Please enter the distance in metres.");
+      setValidationMsg(ERROR_RUN_DISTANCE_INVALID);
       return;
     }
 
@@ -140,7 +148,7 @@ export default function LogRunScreen() {
         {submitError ? (
           <ErrorState
             title="Couldn't save your run"
-            description="Check your connection and try again. Your times are preserved."
+            description={ERROR_RUN_NETWORK}
             onRetry={handleRetry}
             style={{ marginBottom: 16 }}
           />
@@ -155,7 +163,7 @@ export default function LogRunScreen() {
             marginBottom: 6,
           }}
         >
-          Finish time (HH:MM:SS)
+          {RUN_TIME_LABEL}
         </Text>
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
           <View style={{ flex: 1, alignItems: "center" }}>
@@ -234,13 +242,13 @@ export default function LogRunScreen() {
             marginBottom: 6,
           }}
         >
-          Distance (metres)
+          {RUN_DISTANCE_LABEL}
         </Text>
         <TextInput
           value={distanceMeters}
           onChangeText={setDistanceMeters}
           keyboardType="number-pad"
-          placeholder="e.g. 5000"
+          placeholder={RUN_DISTANCE_PLACEHOLDER}
           placeholderTextColor={Colors.textMuted}
           accessibilityLabel="Distance in metres"
           style={{

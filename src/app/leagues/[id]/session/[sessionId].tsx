@@ -17,6 +17,10 @@ import { Colors } from "@/constants/colors";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDuration } from "@/lib/league-utils";
 import type { RunningSession, RunningSessionRun } from "@/lib/league-types";
+import {
+  RUN_DISTANCE_LABEL,
+  RUN_DISTANCE_PLACEHOLDER,
+} from "@/lib/result-submission-strings";
 
 export default function SessionDetailScreen() {
   const { id, sessionId } = useLocalSearchParams<{ id: string; sessionId: string }>();
@@ -241,12 +245,12 @@ export default function SessionDetailScreen() {
               </View>
             </View>
 
-            <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSecondary, marginBottom: 6 }}>Distance (meters)</Text>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSecondary, marginBottom: 6 }}>{RUN_DISTANCE_LABEL}</Text>
             <TextInput
               value={distanceMeters}
               onChangeText={setDistanceMeters}
               keyboardType="number-pad"
-              placeholder={session.distance_meters ? String(session.distance_meters) : "5000"}
+              placeholder={session.distance_meters ? String(session.distance_meters) : RUN_DISTANCE_PLACEHOLDER}
               placeholderTextColor={Colors.textMuted}
               style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 16 }}
             />

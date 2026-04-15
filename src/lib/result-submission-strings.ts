@@ -68,3 +68,20 @@ export const WINNER_SECTION_LABEL = "Winner";
 
 /** Set scores section heading. */
 export const SET_SCORES_SECTION_LABEL = "Set Scores";
+
+// ── Running sport ───────────────────────────────────────────────────────────
+
+export const RUN_TIME_LABEL = "Finish time (MM:SS)";
+export const RUN_TIME_PLACEHOLDER = "e.g. 25:30";
+export const RUN_DISTANCE_LABEL = "Distance (metres, optional)";
+export const RUN_DISTANCE_PLACEHOLDER = "e.g. 5000";
+export const ERROR_RUN_TIME_REQUIRED =
+  "Enter the finish time in minutes and seconds.";
+export const ERROR_RUN_TIME_INVALID = "Finish time must be greater than zero.";
+export const ERROR_RUN_DISTANCE_INVALID = "Distance must be a number in metres.";
+export const SUCCESS_RUN_LOGGED =
+  "Run logged — your time is now on the leaderboard.";
+export const ERROR_RUN_SUBMIT_FAILED =
+  "Couldn't save — check your connection and try again.";
+export const ERROR_RUN_NETWORK =
+  "Couldn't save — check your connection and try again.";
