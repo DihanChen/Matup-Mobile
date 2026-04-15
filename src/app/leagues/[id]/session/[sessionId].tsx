@@ -22,6 +22,7 @@ import {
   RUN_DISTANCE_LABEL,
   RUN_DISTANCE_PLACEHOLDER,
   ERROR_RUN_TIME_INVALID,
+  ERROR_RUN_DISTANCE_INVALID,
   SUCCESS_RUN_LOGGED,
   ERROR_RUN_SUBMIT_FAILED,
   ERROR_RUN_NETWORK,
@@ -44,6 +45,7 @@ export default function SessionDetailScreen() {
 
   // Inline validation / feedback state
   const [timeError, setTimeError] = useState<string | null>(null);
+  const [distanceError, setDistanceError] = useState<string | null>(null);
   const [runNetworkError, setRunNetworkError] = useState<string | null>(null);
   const [runSuccessMsg, setRunSuccessMsg] = useState<string | null>(null);
 
@@ -78,21 +80,42 @@ export default function SessionDetailScreen() {
 
   async function handleSubmitRun() {
     setTimeError(null);
+    setDistanceError(null);
     setRunNetworkError(null);
     setRunSuccessMsg(null);
 
     const mins = parseInt(minutes, 10) || 0;
     const secs = parseInt(seconds, 10) || 0;
     const totalSeconds = mins * 60 + secs;
-    const dist = parseInt(distanceMeters, 10) || 0;
 
     if (totalSeconds <= 0) {
       setTimeError(ERROR_RUN_TIME_INVALID);
       return;
     }
 
+    // Distance is optional. Blank → omit from payload (backend falls back to
+    // the session's configured distance_meters). Non-blank must parse as a
+    // positive integer or we surface ERROR_RUN_DISTANCE_INVALID inline.
+    const trimmedDistance = distanceMeters.trim();
+    let distancePayload: number | undefined = undefined;
+    if (trimmedDistance !== "") {
+      const parsedDistance = Number(trimmedDistance);
+      if (!Number.isFinite(parsedDistance) || parsedDistance <= 0) {
+        setDistanceError(ERROR_RUN_DISTANCE_INVALID);
+        return;
+      }
+      distancePayload = Math.round(parsedDistance);
+    }
+
     setSubmittingRun(true);
     const { data: { session: authSession } } = await supabase.auth.getSession();
+
+    const requestBody: { elapsed_seconds: number; distance_meters?: number } = {
+      elapsed_seconds: totalSeconds,
+    };
+    if (distancePayload !== undefined) {
+      requestBody.distance_meters = distancePayload;
+    }
 
     try {
       const res = await fetch(
@@ -103,10 +126,7 @@ export default function SessionDetailScreen() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${authSession?.access_token}`,
           },
-          body: JSON.stringify({
-            elapsed_seconds: totalSeconds,
-            distance_meters: dist,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -261,12 +281,15 @@ export default function SessionDetailScreen() {
             <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSecondary, marginBottom: 6 }}>{RUN_DISTANCE_LABEL}</Text>
             <TextInput
               value={distanceMeters}
-              onChangeText={setDistanceMeters}
+              onChangeText={(v) => { setDistanceMeters(v); setDistanceError(null); }}
               keyboardType="number-pad"
               placeholder={session.distance_meters ? String(session.distance_meters) : RUN_DISTANCE_PLACEHOLDER}
               placeholderTextColor={Colors.textMuted}
-              style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 16 }}
+              style={{ borderWidth: 1, borderColor: distanceError ? Colors.error : Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: distanceError ? 4 : 16 }}
             />
+            {distanceError && (
+              <Text style={{ color: Colors.error, fontSize: 12, marginBottom: 12 }} accessibilityRole="alert">{distanceError}</Text>
+            )}
 
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity

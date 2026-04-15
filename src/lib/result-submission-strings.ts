@@ -78,7 +78,7 @@ export const RUN_DISTANCE_PLACEHOLDER = "e.g. 5000";
 export const ERROR_RUN_TIME_REQUIRED =
   "Enter the finish time in minutes and seconds.";
 export const ERROR_RUN_TIME_INVALID = "Finish time must be greater than zero.";
-export const ERROR_RUN_DISTANCE_INVALID = "Distance must be a number in metres.";
+export const ERROR_RUN_DISTANCE_INVALID = "Distance must be a positive number in metres.";
 export const SUCCESS_RUN_LOGGED =
   "Run logged — your time is now on the leaderboard.";
 export const ERROR_RUN_SUBMIT_FAILED =
