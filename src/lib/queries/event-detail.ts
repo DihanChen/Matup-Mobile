@@ -46,6 +46,7 @@ type EventDetailData = {
   event: EventDetailEvent | null;
   host: HostInfo | null;
   participants: ParticipantInfo[];
+  participantsError: string | null;
   existingReviews: string[];
   comments: EventComment[];
 };
@@ -67,6 +68,7 @@ export async function fetchEventDetailData(
       event: null,
       host: null,
       participants: [],
+      participantsError: null,
       existingReviews: [],
       comments: [],
     };
@@ -95,11 +97,12 @@ export async function fetchEventDetailData(
     };
   }
 
-  const { data: participantsData } = await supabase
+  const { data: participantsData, error: participantsQueryError } = await supabase
     .from("event_participants")
     .select("id, user_id")
     .eq("event_id", eventId);
 
+  const participantsError = participantsQueryError?.message ?? null;
   const participantRows = participantsData || [];
   const participantIds = participantRows.map((participant) => participant.user_id);
   const { data: participantProfiles } = participantIds.length
@@ -182,6 +185,7 @@ export async function fetchEventDetailData(
     event,
     host,
     participants,
+    participantsError,
     existingReviews,
     comments,
   };
