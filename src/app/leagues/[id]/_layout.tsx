@@ -20,6 +20,10 @@ export default function LeagueDetailLayout() {
         name="session/[sessionId]/log-run"
         options={{ presentation: "card" }}
       />
+      <Stack.Screen
+        name="create-session"
+        options={{ presentation: "card" }}
+      />
     </Stack>
   );
 }
