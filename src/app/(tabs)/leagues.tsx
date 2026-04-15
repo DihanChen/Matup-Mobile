@@ -333,10 +333,10 @@ export default function LeaguesScreen() {
             ) : overdueFixtures.length > 0 ? (
               <View
                 style={{
-                  backgroundColor: "#fff8f1",
+                  backgroundColor: Colors.warningBg,
                   borderRadius: 16,
                   borderWidth: 1,
-                  borderColor: "#fed7aa",
+                  borderColor: Colors.warningBorder,
                   padding: 14,
                   marginBottom: 14,
                 }}
@@ -363,7 +363,7 @@ export default function LeaguesScreen() {
                       numberOfLines={1}
                       style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}
                     >
-                      {f.leagueName} · {new Date(f.matchDate).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                      {f.leagueName} · {(() => { const d = Math.floor((Date.now() - new Date(f.matchDate).getTime()) / 86400000); return `${d} ${d === 1 ? "day" : "days"} overdue`; })()}
                     </Text>
                     <Text
                       numberOfLines={1}

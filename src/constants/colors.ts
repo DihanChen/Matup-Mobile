@@ -14,6 +14,9 @@ export const Colors = {
   error: "#ef4444", // red-500
   errorBg: "#fef2f2", // red-50
   errorBorder: "#fecaca", // red-200
+  warning: "#f97316", // orange-500 (same as accent)
+  warningBg: "#fff8f1", // orange-50
+  warningBorder: "#fed7aa", // orange-200
   success: "#10b981", // emerald-500
   successBg: "#ecfdf5", // emerald-50
   white: "#ffffff",
