@@ -210,7 +210,7 @@ export default function SubmitResultScreen() {
                 borderRadius: 12,
                 borderWidth: 2,
                 borderColor: outcomeType === type ? Colors.accent : Colors.border,
-                backgroundColor: outcomeType === type ? "#fff7ed" : Colors.white,
+                backgroundColor: outcomeType === type ? Colors.accentTint : Colors.white,
                 alignItems: "center",
               }}
               activeOpacity={0.7}
@@ -233,7 +233,7 @@ export default function SubmitResultScreen() {
               borderRadius: 12,
               borderWidth: 2,
               borderColor: winnerError ? Colors.error : (winner === "A" ? Colors.accent : Colors.border),
-              backgroundColor: winner === "A" ? "#fff7ed" : Colors.white,
+              backgroundColor: winner === "A" ? Colors.accentTint : Colors.white,
               alignItems: "center",
             }}
             activeOpacity={0.7}
@@ -253,7 +253,7 @@ export default function SubmitResultScreen() {
               borderRadius: 12,
               borderWidth: 2,
               borderColor: winnerError ? Colors.error : (winner === "B" ? Colors.accent : Colors.border),
-              backgroundColor: winner === "B" ? "#fff7ed" : Colors.white,
+              backgroundColor: winner === "B" ? Colors.accentTint : Colors.white,
               alignItems: "center",
             }}
             activeOpacity={0.7}

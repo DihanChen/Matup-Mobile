@@ -3,6 +3,7 @@ export const Colors = {
   primaryLight: "#27272a", // zinc-800
   accent: "#f97316", // orange-500
   accentHover: "#dd6411", // orange-600
+  accentTint: "#fff7ed", // orange-50 (selected-state bg for accent-bordered buttons)
   background: "#ffffff",
   surface: "#fafafa", // zinc-50
   border: "#e4e4e7", // zinc-200
