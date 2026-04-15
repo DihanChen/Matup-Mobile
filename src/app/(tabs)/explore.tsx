@@ -61,6 +61,26 @@ const DISCOVER_TAB_OPTIONS = [
   { value: "courts" as const, label: "Courts" },
 ];
 
+/**
+ * Returns true when an event starts today in the device's local timezone AND
+ * has at least one open spot. Compares year/month/date locally — never uses
+ * toISOString() which would convert to UTC and shift day boundaries.
+ */
+export function isTonightWithOpenSpots(event: {
+  datetime: string;
+  max_participants: number;
+  participant_count?: number;
+}): boolean {
+  const now = new Date();
+  const eventStart = new Date(event.datetime);
+  const sameLocalDay =
+    eventStart.getFullYear() === now.getFullYear() &&
+    eventStart.getMonth() === now.getMonth() &&
+    eventStart.getDate() === now.getDate();
+  const hasOpenSpots = (event.participant_count ?? 0) < event.max_participants;
+  return sameLocalDay && hasOpenSpots;
+}
+
 export default function ExploreScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -89,6 +109,7 @@ export default function ExploreScreen() {
 
   // Filters
   const [sportFilter, setSportFilter] = useState("");
+  const [tonightOnly, setTonightOnly] = useState(false);
 
   const [joining, setJoining] = useState<string | null>(null);
 
@@ -173,7 +194,8 @@ export default function ExploreScreen() {
 
   // Derived data with distance
   const eventsWithDistance: ExploreEvent[] = useMemo(() => {
-    return events.map((event) => {
+    const filtered = tonightOnly ? events.filter(isTonightWithOpenSpots) : events;
+    return filtered.map((event) => {
       if (
         userLocation &&
         event.latitude != null &&
@@ -191,7 +213,7 @@ export default function ExploreScreen() {
       }
       return event;
     });
-  }, [events, userLocation]);
+  }, [events, userLocation, tonightOnly]);
 
   const displayCourts: DisplayCourt[] = useMemo(() => {
     return dbCourts.map((court) => ({
@@ -328,6 +350,39 @@ export default function ExploreScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}
         >
+          <TouchableOpacity
+            key="__tonight__"
+            onPress={() => setTonightOnly((v) => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Join tonight filter"
+            accessibilityState={{ selected: tonightOnly }}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 999,
+              backgroundColor: tonightOnly ? Colors.accent : Colors.surface,
+              borderWidth: 1,
+              borderColor: tonightOnly ? Colors.accent : Colors.border,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Ionicons
+                name="moon-outline"
+                size={14}
+                color={tonightOnly ? Colors.white : Colors.textSecondary}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "600",
+                  color: tonightOnly ? Colors.white : Colors.text,
+                }}
+              >
+                Join tonight
+              </Text>
+            </View>
+          </TouchableOpacity>
           {SPORT_FILTERS.map((filter) => {
             const isSelected = sportFilter === filter.value;
             return (
@@ -591,17 +646,31 @@ export default function ExploreScreen() {
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 16 }}
               ListEmptyComponent={
-                <EmptyState
-                  title="No events nearby"
-                  description="Widen the search radius or try a different sport."
-                  icon={
-                    <Ionicons
-                      name="search-outline"
-                      size={28}
-                      color={Colors.textTertiary}
-                    />
-                  }
-                />
+                tonightOnly ? (
+                  <EmptyState
+                    title="Nothing tonight"
+                    description="No events tonight with open spots"
+                    icon={
+                      <Ionicons
+                        name="moon-outline"
+                        size={28}
+                        color={Colors.textTertiary}
+                      />
+                    }
+                  />
+                ) : (
+                  <EmptyState
+                    title="No events nearby"
+                    description="Widen the search radius or try a different sport."
+                    icon={
+                      <Ionicons
+                        name="search-outline"
+                        size={28}
+                        color={Colors.textTertiary}
+                      />
+                    }
+                  />
+                )
               }
               renderItem={({ item }) => (
                 <EventSwipeCard
