@@ -4,14 +4,20 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import { getApiBaseUrl } from "@/lib/api";
 import { Colors } from "@/constants/colors";
 import { Avatar } from "@/components/ui/Avatar";
 import { Skeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState, ErrorState } from "@/components/ui";
+import {
+  HOSTED_EVENTS_EMPTY_TITLE,
+  HOSTED_EVENTS_LOADING_ERROR,
+  HOSTED_EVENTS_SECTION_LABEL,
+} from "@/lib/profile-strings";
 
 type PublicProfile = {
   id: string;
@@ -21,12 +27,64 @@ type PublicProfile = {
   created_at: string;
 };
 
+type HostedEvent = {
+  id: string;
+  title: string;
+  sport: string;
+  starts_at: string;
+  location: string;
+  max_participants: number | null;
+  current_participants: number | null;
+};
+
+type HostedEventsApiResponse = {
+  events?: HostedEvent[];
+};
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function formatEventDate(startsAt: string): string {
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = MONTH_LABELS[date.getMonth()] ?? "";
+  return `${month} ${date.getDate()}`;
+}
+
+function formatSpots(event: HostedEvent): string {
+  const current = event.current_participants ?? 0;
+  if (event.max_participants == null) {
+    return `${current} joined`;
+  }
+  return `${current} / ${event.max_participants} spots`;
+}
+
+function capitalize(value: string): string {
+  if (!value) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hostedEvents, setHostedEvents] = useState<HostedEvent[]>([]);
+  const [hostedLoading, setHostedLoading] = useState(true);
+  const [hostedError, setHostedError] = useState(false);
 
   useEffect(() => {
     async function fetch() {
@@ -40,6 +98,51 @@ export default function PublicProfileScreen() {
       setLoading(false);
     }
     fetch();
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchHosted() {
+      if (!id) return;
+      setHostedLoading(true);
+      setHostedError(false);
+      try {
+        const {
+          data: { session: authSession },
+        } = await supabase.auth.getSession();
+
+        const headers: Record<string, string> = {};
+        if (authSession?.access_token) {
+          headers.Authorization = `Bearer ${authSession.access_token}`;
+        }
+
+        const response = await fetch(
+          `${getApiBaseUrl()}/api/users/${id}/hosted-events`,
+          { headers }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as HostedEventsApiResponse;
+        if (cancelled) return;
+        setHostedEvents(Array.isArray(payload.events) ? payload.events : []);
+      } catch {
+        if (cancelled) return;
+        setHostedError(true);
+      } finally {
+        if (!cancelled) {
+          setHostedLoading(false);
+        }
+      }
+    }
+
+    fetchHosted();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (loading) {
@@ -79,19 +182,109 @@ export default function PublicProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ alignItems: "center", padding: 24 }}>
-        <Avatar name={profile.name} avatarUrl={profile.avatar_url} size={80} />
-        <Text style={{ fontSize: 22, fontWeight: "800", color: Colors.text, marginTop: 12 }}>
-          {profile.name || "Anonymous"}
-        </Text>
-        <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 4 }}>
-          Joined {joinDate}
-        </Text>
-        {profile.bio && (
-          <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 12, textAlign: "center", lineHeight: 20 }}>
-            {profile.bio}
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <View style={{ alignItems: "center", padding: 24 }}>
+          <Avatar name={profile.name} avatarUrl={profile.avatar_url} size={80} />
+          <Text style={{ fontSize: 22, fontWeight: "800", color: Colors.text, marginTop: 12 }}>
+            {profile.name || "Anonymous"}
           </Text>
-        )}
+          <Text style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 4 }}>
+            Joined {joinDate}
+          </Text>
+          {profile.bio && (
+            <Text style={{ fontSize: 14, color: Colors.textSecondary, marginTop: 12, textAlign: "center", lineHeight: 20 }}>
+              {profile.bio}
+            </Text>
+          )}
+        </View>
+
+        <View style={{ paddingHorizontal: 24, paddingBottom: 24 }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "700",
+              color: Colors.text,
+              marginBottom: 12,
+            }}
+          >
+            {HOSTED_EVENTS_SECTION_LABEL}
+          </Text>
+
+          {hostedError ? (
+            <ErrorState compact title={HOSTED_EVENTS_LOADING_ERROR} />
+          ) : hostedLoading ? (
+            <View style={{ gap: 12 }}>
+              <Skeleton width="100%" height={64} borderRadius={12} />
+              <Skeleton width="100%" height={64} borderRadius={12} />
+            </View>
+          ) : hostedEvents.length === 0 ? (
+            <EmptyState compact title={HOSTED_EVENTS_EMPTY_TITLE} />
+          ) : (
+            <View style={{ gap: 12 }}>
+              {hostedEvents.map((event) => (
+                <TouchableOpacity
+                  key={event.id}
+                  activeOpacity={0.8}
+                  onPress={() => router.push(`/events/${event.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${event.title}, ${capitalize(event.sport)}, ${formatEventDate(event.starts_at)}`}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: 12,
+                    padding: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    backgroundColor: Colors.background,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: Colors.accentTint,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: Colors.accent,
+                      }}
+                    >
+                      {capitalize(event.sport).slice(0, 3)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontSize: 15,
+                        fontWeight: "600",
+                        color: Colors.text,
+                      }}
+                    >
+                      {event.title}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      {formatEventDate(event.starts_at)} • {formatSpots(event)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </View>
   );
