@@ -43,20 +43,40 @@ export default function LogRunScreen() {
     const mins = parseInt(minutes, 10) || 0;
     const secs = parseInt(seconds, 10) || 0;
     const totalSeconds = mins * 60 + secs;
-    const dist = parseInt(distanceMeters, 10) || 0;
 
     if (totalSeconds <= 0) {
       setValidationMsg(ERROR_RUN_TIME_REQUIRED);
       return;
     }
-    if (dist <= 0) {
-      setValidationMsg(ERROR_RUN_DISTANCE_INVALID);
-      return;
+
+    // Distance is optional. Blank → omit from payload (backend falls back to
+    // the session's configured distance_meters). Non-blank must parse as a
+    // positive integer or we surface ERROR_RUN_DISTANCE_INVALID inline.
+    const trimmedDistance = distanceMeters.trim();
+    let distancePayload: number | undefined = undefined;
+    if (trimmedDistance !== "") {
+      const parsedDistance = Number(trimmedDistance);
+      if (!Number.isFinite(parsedDistance) || parsedDistance <= 0) {
+        setValidationMsg(ERROR_RUN_DISTANCE_INVALID);
+        return;
+      }
+      distancePayload = Math.round(parsedDistance);
     }
 
     setSubmitting(true);
     try {
       const { data: { session: authSession } } = await supabase.auth.getSession();
+      const requestBody: {
+        elapsed_seconds: number;
+        distance_meters?: number;
+        notes?: string;
+      } = {
+        elapsed_seconds: totalSeconds,
+        notes: notes.trim() || undefined,
+      };
+      if (distancePayload !== undefined) {
+        requestBody.distance_meters = distancePayload;
+      }
       const res = await fetch(
         `${getApiBaseUrl()}/api/sessions/${sessionId}/runs/submit`,
         {
@@ -65,11 +85,7 @@ export default function LogRunScreen() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${authSession?.access_token}`,
           },
-          body: JSON.stringify({
-            elapsed_seconds: totalSeconds,
-            distance_meters: dist,
-            notes: notes.trim() || undefined,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
