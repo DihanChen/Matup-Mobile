@@ -11,14 +11,24 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/providers/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { getApiBaseUrl } from "@/lib/api";
 import { Colors } from "@/constants/colors";
 import { getLeagueListData, type LeagueWithCount } from "@/lib/queries/leagues";
-import { FORMAT_LABELS } from "@/lib/league-types";
+import { FORMAT_LABELS, type ApiFixture } from "@/lib/league-types";
 import { SPORT_ICON_MAP } from "@/constants/events";
 import { Skeleton } from "@/components/ui/LoadingSkeleton";
 import { EmptyState, ErrorState } from "@/components/ui";
 
 type ViewFilter = "all" | "owned" | "joined";
+
+type OverdueFixture = {
+  fixtureId: string;
+  leagueId: string;
+  leagueName: string;
+  matchDate: string;
+  sideA: string;
+  sideB: string;
+};
 
 export default function LeaguesScreen() {
   const router = useRouter();
@@ -31,6 +41,9 @@ export default function LeaguesScreen() {
   const [error, setError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
+
+  const [overdueFixtures, setOverdueFixtures] = useState<OverdueFixture[]>([]);
+  const [overdueError, setOverdueError] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -45,15 +58,71 @@ export default function LeaguesScreen() {
     setLoading(false);
   }, [user]);
 
+  const fetchOverdueFixtures = useCallback(async () => {
+    if (!user) return;
+    setOverdueError(false);
+    try {
+      const data = await getLeagueListData(supabase, user.id);
+      const myOwnedLeagues = data.ownedLeagues;
+      if (myOwnedLeagues.length === 0) return;
+
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.access_token) return;
+
+      const today = new Date().toISOString().split("T")[0];
+      const leaguesToCheck = myOwnedLeagues.slice(0, 5);
+      const results: OverdueFixture[] = [];
+
+      await Promise.all(
+        leaguesToCheck.map(async (league) => {
+          try {
+            const res = await fetch(
+              `${getApiBaseUrl()}/api/leagues/${league.id}/fixtures`,
+              { headers: { Authorization: `Bearer ${authSession.access_token}` } }
+            );
+            if (!res.ok) return;
+            const fixturesData = await res.json();
+            const fixtures: ApiFixture[] = fixturesData.fixtures || [];
+            const overdue = fixtures.filter(
+              (f) =>
+                f.status !== "completed" &&
+                f.starts_at &&
+                f.starts_at.split("T")[0] < today
+            );
+            for (const f of overdue) {
+              const sideA = f.participants.filter((p) => p.side === "A").map((p) => p.name || "?").join(" / ") || "TBD";
+              const sideB = f.participants.filter((p) => p.side === "B").map((p) => p.name || "?").join(" / ") || "TBD";
+              results.push({
+                fixtureId: f.id,
+                leagueId: league.id,
+                leagueName: league.name,
+                matchDate: f.starts_at!,
+                sideA,
+                sideB,
+              });
+            }
+          } catch {
+            // Non-blocking — skip this league
+          }
+        })
+      );
+
+      setOverdueFixtures(results);
+    } catch {
+      setOverdueError(true);
+    }
+  }, [user]);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchOverdueFixtures();
+  }, [fetchData, fetchOverdueFixtures]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    await Promise.all([fetchData(), fetchOverdueFixtures()]);
     setRefreshing(false);
-  }, [fetchData]);
+  }, [fetchData, fetchOverdueFixtures]);
 
   const allLeagues = useMemo(() => {
     return [...ownedLeagues, ...joinedLeagues].sort(
@@ -250,6 +319,79 @@ export default function LeaguesScreen() {
             onRefresh={onRefresh}
             tintColor={Colors.accent}
           />
+        }
+        ListHeaderComponent={
+          ownedLeagues.length > 0 ? (
+            overdueError ? (
+              <ErrorState
+                compact
+                title="Couldn't load overdue fixtures"
+                description="Pull down to retry."
+                onRetry={onRefresh}
+                style={{ marginBottom: 12 }}
+              />
+            ) : overdueFixtures.length > 0 ? (
+              <View
+                style={{
+                  backgroundColor: "#fff8f1",
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "#fed7aa",
+                  padding: 14,
+                  marginBottom: 14,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                  <Ionicons name="alert-circle" size={16} color={Colors.accentHover} />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: Colors.accentHover }}>
+                    Attention needed
+                  </Text>
+                </View>
+                {overdueFixtures.map((f) => (
+                  <View
+                    key={f.fixtureId}
+                    style={{
+                      backgroundColor: Colors.white,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      padding: 12,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}
+                    >
+                      {f.leagueName} · {new Date(f.matchDate).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 14, fontWeight: "600", color: Colors.text, marginBottom: 8 }}
+                    >
+                      {f.sideA} vs {f.sideB}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        router.push(`/leagues/${f.leagueId}/submit-result?fixtureId=${f.fixtureId}` as never)
+                      }
+                      style={{
+                        backgroundColor: Colors.accent,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        alignItems: "center",
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.white }}>
+                        Submit result
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null
+          ) : null
         }
         ListEmptyComponent={
           error ? (
