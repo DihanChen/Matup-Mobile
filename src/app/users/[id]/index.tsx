@@ -17,6 +17,12 @@ import {
   HOSTED_EVENTS_EMPTY_TITLE,
   HOSTED_EVENTS_LOADING_ERROR,
   HOSTED_EVENTS_SECTION_LABEL,
+  LEAGUE_STATS_TITLE,
+  STAT_PLAYED_LABEL,
+  STAT_WIN_RATE_LABEL,
+  STAT_WON_LABEL,
+  STAT_LOST_LABEL,
+  STATS_LOAD_ERROR,
 } from "@/lib/profile-strings";
 
 type PublicProfile = {
@@ -39,6 +45,17 @@ type HostedEvent = {
 
 type HostedEventsApiResponse = {
   events?: HostedEvent[];
+};
+
+type LeagueStats = {
+  played: number;
+  won: number;
+  lost: number;
+  winRate: number;
+};
+
+type LeagueStatsApiResponse = {
+  stats?: LeagueStats;
 };
 
 const MONTH_LABELS = [
@@ -76,6 +93,27 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function StatColumn({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color: string;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: "center" }}>
+      <Text
+        style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 4 }}
+      >
+        {label}
+      </Text>
+      <Text style={{ fontSize: 20, fontWeight: "800", color }}>{value}</Text>
+    </View>
+  );
+}
+
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -85,6 +123,9 @@ export default function PublicProfileScreen() {
   const [hostedEvents, setHostedEvents] = useState<HostedEvent[]>([]);
   const [hostedLoading, setHostedLoading] = useState(true);
   const [hostedError, setHostedError] = useState(false);
+  const [stats, setStats] = useState<LeagueStats | null>(null);
+  const [statsError, setStatsError] = useState(false);
+  const [statsReloadKey, setStatsReloadKey] = useState(0);
 
   useEffect(() => {
     async function fetch() {
@@ -144,6 +185,46 @@ export default function PublicProfileScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchStats() {
+      if (!id) return;
+      setStatsError(false);
+      try {
+        const {
+          data: { session: authSession },
+        } = await supabase.auth.getSession();
+
+        const headers: Record<string, string> = {};
+        if (authSession?.access_token) {
+          headers.Authorization = `Bearer ${authSession.access_token}`;
+        }
+
+        const response = await fetch(
+          `${getApiBaseUrl()}/api/users/${id}/stats`,
+          { headers }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as LeagueStatsApiResponse;
+        if (cancelled) return;
+        setStats(payload.stats ?? null);
+      } catch {
+        if (cancelled) return;
+        setStatsError(true);
+      }
+    }
+
+    fetchStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, statsReloadKey]);
 
   if (loading) {
     return (
@@ -285,6 +366,47 @@ export default function PublicProfileScreen() {
             </View>
           )}
         </View>
+
+        {(statsError || (stats && stats.played > 0)) && (
+          <View style={{ paddingHorizontal: 24, paddingBottom: 24 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "700",
+                color: Colors.text,
+                marginBottom: 12,
+              }}
+            >
+              {LEAGUE_STATS_TITLE}
+            </Text>
+
+            {statsError ? (
+              <ErrorState
+                compact
+                title={STATS_LOAD_ERROR}
+                onRetry={() => setStatsReloadKey((k) => k + 1)}
+                retryLabel="Try again"
+              />
+            ) : stats ? (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  borderRadius: 12,
+                  padding: 16,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  backgroundColor: Colors.background,
+                }}
+              >
+                <StatColumn label={STAT_PLAYED_LABEL} value={stats.played} color={Colors.text} />
+                <StatColumn label={STAT_WIN_RATE_LABEL} value={`${stats.winRate}%`} color={Colors.accent} />
+                <StatColumn label={STAT_WON_LABEL} value={stats.won} color={Colors.success} />
+                <StatColumn label={STAT_LOST_LABEL} value={stats.lost} color={Colors.error} />
+              </View>
+            ) : null}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
