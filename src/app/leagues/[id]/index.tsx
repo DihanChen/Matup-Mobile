@@ -487,6 +487,11 @@ export default function LeagueDetailScreen() {
                 onMemberPress={(userId) => router.push(`/users/${userId}` as never)}
                 onSessionPress={(sessionId) => router.push(`/leagues/${id}/session/${sessionId}` as never)}
                 onLogRunPress={(sessionId) => router.push(`/leagues/${id}/session/${sessionId}/log-run` as never)}
+                onAddSession={
+                  isOwnerOrAdmin && isRunningLeague
+                    ? () => router.push(`/leagues/${id}/create-session` as never)
+                    : undefined
+                }
               />
             </>
           )}
@@ -654,6 +659,7 @@ function OverviewTab({
   onMemberPress,
   onSessionPress,
   onLogRunPress,
+  onAddSession,
 }: {
   members: LeagueMember[];
   isOwnerOrAdmin: boolean;
@@ -664,6 +670,7 @@ function OverviewTab({
   onMemberPress: (userId: string) => void;
   onSessionPress: (sessionId: string) => void;
   onLogRunPress: (sessionId: string) => void;
+  onAddSession?: () => void;
 }) {
   return (
     <View>
@@ -702,6 +709,31 @@ function OverviewTab({
             </View>
           ))}
         </View>
+      )}
+
+      {/* Add session CTA (organizer + running league only) */}
+      {isRunningLeague && onAddSession && (
+        <TouchableOpacity
+          onPress={onAddSession}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Add running session"
+          style={{
+            marginBottom: 12,
+            paddingVertical: 12,
+            paddingHorizontal: 14,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderStyle: "dashed",
+            borderColor: Colors.accent,
+            alignItems: "center",
+            backgroundColor: Colors.accentTint,
+          }}
+        >
+          <Text style={{ color: Colors.accent, fontWeight: "700", fontSize: 13 }}>
+            + Add session
+          </Text>
+        </TouchableOpacity>
       )}
 
       {/* Running sessions */}
