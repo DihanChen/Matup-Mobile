@@ -25,9 +25,11 @@ import {
 import { joinEvent } from "@/lib/queries/events";
 import { Avatar } from "@/components/ui/Avatar";
 import { Skeleton } from "@/components/ui/LoadingSkeleton";
+import { EmptyState } from "@/components/ui";
 import { Colors } from "@/constants/colors";
 import { getSportEmoji } from "@/lib/share/sportEmojis";
 import { getSportCover } from "@/lib/sportCovers";
+import { ParticipantsRow } from "@/components/events/ParticipantsRow";
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,6 +44,9 @@ export default function EventDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [participantsError, setParticipantsError] = useState<string | null>(
+    null
+  );
 
   // Action states
   const [joining, setJoining] = useState(false);
@@ -76,6 +81,7 @@ export default function EventDetailScreen() {
     setEvent(detail.event);
     setHost(detail.host);
     setParticipants(detail.participants);
+    setParticipantsError(detail.participantsError);
     setExistingReviews(detail.existingReviews);
     setComments(detail.comments);
     setLoading(false);
@@ -352,33 +358,103 @@ export default function EventDetailScreen() {
             <Text style={{ fontSize: 15, fontWeight: "600", color: Colors.text, marginBottom: 10 }}>
               Participants ({participants.length})
             </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-              {participants.map((p) => (
-                <TouchableOpacity
-                  key={p.id}
-                  onPress={() => router.push(`/users/${p.user_id}` as never)}
-                  style={{ alignItems: "center", width: 60 }}
-                  activeOpacity={0.7}
-                >
-                  <Avatar name={p.name} avatarUrl={p.avatar_url} size={40} />
-                  <Text numberOfLines={1} style={{ fontSize: 10, color: Colors.textSecondary, marginTop: 4, textAlign: "center" }}>
-                    {p.name || "User"}
-                  </Text>
-                  {isPastEvent && !existingReviews.includes(p.user_id) && p.user_id !== user?.id && (
+            {loading ? (
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} width={44} height={44} borderRadius={22} />
+                ))}
+              </View>
+            ) : participantsError ? (
+              <Text
+                style={{ fontSize: 13, color: Colors.textSecondary }}
+                accessibilityRole="alert"
+              >
+                Couldn't load participants
+              </Text>
+            ) : participants.length === 0 ? (
+              <EmptyState
+                compact
+                icon={<Ionicons name="people-outline" size={20} color={Colors.textTertiary} />}
+                title="No one has joined yet — be the first!"
+              />
+            ) : (
+              <ParticipantsRow
+                participants={participants.map((p) => ({
+                  user_id: p.user_id,
+                  name: p.name,
+                  avatar_url: p.avatar_url,
+                }))}
+                onPress={(userId) => router.push(`/users/${userId}` as never)}
+              />
+            )}
+
+            {/* Post-event review affordance — preserved from the previous grid. */}
+            {isPastEvent && participants.length > 0 && (
+              <View style={{ marginTop: 12, gap: 8 }}>
+                {participants
+                  .filter(
+                    (p) =>
+                      p.user_id !== user?.id &&
+                      !existingReviews.includes(p.user_id)
+                  )
+                  .map((p) => (
                     <TouchableOpacity
+                      key={`review-${p.id}`}
                       onPress={() => {
                         setReviewingUser(p);
                         setReviewRating(5);
                         setReviewComment("");
                         setShowReviewModal(true);
                       }}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        borderRadius: 10,
+                        backgroundColor: Colors.accentTint,
+                        borderWidth: 1,
+                        borderColor: Colors.accent,
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Review ${p.name ?? "participant"}`}
                     >
-                      <Text style={{ fontSize: 9, color: Colors.accent, fontWeight: "600", marginTop: 2 }}>Review</Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 10,
+                          flex: 1,
+                        }}
+                      >
+                        <Avatar name={p.name} avatarUrl={p.avatar_url} size={28} />
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "600",
+                            color: Colors.text,
+                            flex: 1,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {p.name || "Player"}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "700",
+                          color: Colors.accent,
+                        }}
+                      >
+                        Review
+                      </Text>
                     </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+                  ))}
+              </View>
+            )}
           </View>
 
           {/* Comments */}
