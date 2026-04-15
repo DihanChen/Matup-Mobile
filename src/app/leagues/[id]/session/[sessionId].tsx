@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   ActivityIndicator,
 } from "react-native";
@@ -15,11 +14,17 @@ import { supabase } from "@/lib/supabase";
 import { getApiBaseUrl } from "@/lib/api";
 import { Colors } from "@/constants/colors";
 import { Avatar } from "@/components/ui/Avatar";
+import { ErrorState } from "@/components/ui";
 import { formatDuration } from "@/lib/league-utils";
 import type { RunningSession, RunningSessionRun } from "@/lib/league-types";
 import {
+  RUN_TIME_LABEL,
   RUN_DISTANCE_LABEL,
   RUN_DISTANCE_PLACEHOLDER,
+  ERROR_RUN_TIME_INVALID,
+  SUCCESS_RUN_LOGGED,
+  ERROR_RUN_SUBMIT_FAILED,
+  ERROR_RUN_NETWORK,
 } from "@/lib/result-submission-strings";
 
 export default function SessionDetailScreen() {
@@ -36,6 +41,11 @@ export default function SessionDetailScreen() {
   const [seconds, setSeconds] = useState("");
   const [distanceMeters, setDistanceMeters] = useState("");
   const [showRunEntry, setShowRunEntry] = useState(false);
+
+  // Inline validation / feedback state
+  const [timeError, setTimeError] = useState<string | null>(null);
+  const [runNetworkError, setRunNetworkError] = useState<string | null>(null);
+  const [runSuccessMsg, setRunSuccessMsg] = useState<string | null>(null);
 
   const fetchSession = useCallback(async () => {
     if (!id || !sessionId) return;
@@ -67,17 +77,17 @@ export default function SessionDetailScreen() {
   const canSubmitRun = session && (session.status === "open" || session.status === "scheduled") && !session.my_run;
 
   async function handleSubmitRun() {
+    setTimeError(null);
+    setRunNetworkError(null);
+    setRunSuccessMsg(null);
+
     const mins = parseInt(minutes, 10) || 0;
     const secs = parseInt(seconds, 10) || 0;
     const totalSeconds = mins * 60 + secs;
     const dist = parseInt(distanceMeters, 10) || 0;
 
     if (totalSeconds <= 0) {
-      Alert.alert("Required", "Please enter your time.");
-      return;
-    }
-    if (dist <= 0) {
-      Alert.alert("Required", "Please enter the distance.");
+      setTimeError(ERROR_RUN_TIME_INVALID);
       return;
     }
 
@@ -101,7 +111,7 @@ export default function SessionDetailScreen() {
       );
 
       if (res.ok) {
-        Alert.alert("Submitted", "Your run has been recorded.");
+        setRunSuccessMsg(SUCCESS_RUN_LOGGED);
         setShowRunEntry(false);
         setMinutes("");
         setSeconds("");
@@ -109,10 +119,10 @@ export default function SessionDetailScreen() {
         await fetchSession();
       } else {
         const err = await res.json();
-        Alert.alert("Error", err.error || "Failed to submit run.");
+        setRunNetworkError(err.error || ERROR_RUN_SUBMIT_FAILED);
       }
     } catch {
-      Alert.alert("Error", "Something went wrong.");
+      setRunNetworkError(ERROR_RUN_NETWORK);
     }
     setSubmittingRun(false);
   }
@@ -220,30 +230,33 @@ export default function SessionDetailScreen() {
           <View style={{ backgroundColor: Colors.surface, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.border }}>
             <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 12 }}>Log Your Run</Text>
 
-            <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSecondary, marginBottom: 6 }}>Time</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+            <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSecondary, marginBottom: 6 }}>{RUN_TIME_LABEL}</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: timeError ? 4 : 12 }}>
               <View style={{ flex: 1 }}>
                 <TextInput
                   value={minutes}
-                  onChangeText={setMinutes}
+                  onChangeText={(v) => { setMinutes(v); setTimeError(null); }}
                   keyboardType="number-pad"
                   placeholder="Min"
                   placeholderTextColor={Colors.textMuted}
-                  style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, textAlign: "center", fontSize: 16, fontWeight: "700", color: Colors.text }}
+                  style={{ borderWidth: 1, borderColor: timeError ? Colors.error : Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, textAlign: "center", fontSize: 16, fontWeight: "700", color: Colors.text }}
                 />
               </View>
               <Text style={{ fontSize: 20, fontWeight: "700", color: Colors.textTertiary, alignSelf: "center" }}>:</Text>
               <View style={{ flex: 1 }}>
                 <TextInput
                   value={seconds}
-                  onChangeText={setSeconds}
+                  onChangeText={(v) => { setSeconds(v); setTimeError(null); }}
                   keyboardType="number-pad"
                   placeholder="Sec"
                   placeholderTextColor={Colors.textMuted}
-                  style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, textAlign: "center", fontSize: 16, fontWeight: "700", color: Colors.text }}
+                  style={{ borderWidth: 1, borderColor: timeError ? Colors.error : Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, textAlign: "center", fontSize: 16, fontWeight: "700", color: Colors.text }}
                 />
               </View>
             </View>
+            {timeError && (
+              <Text style={{ color: Colors.error, fontSize: 12, marginBottom: 10 }} accessibilityRole="alert">{timeError}</Text>
+            )}
 
             <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textSecondary, marginBottom: 6 }}>{RUN_DISTANCE_LABEL}</Text>
             <TextInput
@@ -274,7 +287,25 @@ export default function SessionDetailScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            {runNetworkError && (
+              <ErrorState
+                compact
+                title="Couldn't submit run"
+                description={runNetworkError}
+                onRetry={handleSubmitRun}
+                retryLabel="Try again"
+              />
+            )}
           </View>
+        )}
+
+        {runSuccessMsg && (
+          <Text
+            style={{ color: Colors.success, fontSize: 14, fontWeight: "600", textAlign: "center", paddingVertical: 8 }}
+            accessibilityRole="alert"
+          >
+            {runSuccessMsg}
+          </Text>
         )}
 
         {/* Leaderboard */}
