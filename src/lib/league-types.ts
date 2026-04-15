@@ -21,6 +21,8 @@ export type League = {
   status: string;
   created_at: string;
   rules_jsonb?: unknown;
+  visibility?: "public" | "private" | "invite_only";
+  cover_image_url?: string | null;
 };
 
 export type LeagueMember = {

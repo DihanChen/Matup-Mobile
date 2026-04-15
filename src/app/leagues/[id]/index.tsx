@@ -385,6 +385,27 @@ export default function LeagueDetailScreen() {
           >
             <Ionicons name="arrow-back" size={20} color={Colors.white} />
           </TouchableOpacity>
+          {user?.id === league.creator_id && (
+            <TouchableOpacity
+              onPress={() => router.push(`/leagues/${id}/edit` as never)}
+              style={{
+                position: "absolute",
+                top: 50,
+                right: 16,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: "rgba(255,255,255,0.3)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              activeOpacity={0.7}
+              accessibilityLabel="Edit league"
+              accessibilityRole="button"
+            >
+              <Ionicons name="pencil" size={20} color={Colors.white} />
+            </TouchableOpacity>
+          )}
           <View style={{ position: "absolute", bottom: 12, left: 16, flexDirection: "row", gap: 6 }}>
             <View style={{ backgroundColor: "rgba(255,255,255,0.25)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
               <Text style={{ color: Colors.white, fontSize: 11, fontWeight: "700", textTransform: "capitalize" }}>{league.sport_type}</Text>

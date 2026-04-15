@@ -24,6 +24,10 @@ export default function LeagueDetailLayout() {
         name="create-session"
         options={{ presentation: "card" }}
       />
+      <Stack.Screen
+        name="edit"
+        options={{ presentation: "card" }}
+      />
     </Stack>
   );
 }
