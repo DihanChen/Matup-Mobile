@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   ActivityIndicator,
 } from "react-native";
@@ -28,6 +27,7 @@ import {
   WINNER_SECTION_LABEL,
   SET_SCORES_SECTION_LABEL,
 } from "@/lib/result-submission-strings";
+import { ErrorState } from "@/components/ui";
 
 type SetScore = [number, number];
 
@@ -43,6 +43,11 @@ export default function SubmitResultScreen() {
   const [winner, setWinner] = useState<"A" | "B" | null>(null);
   const [sets, setSets] = useState<SetScore[]>([[0, 0]]);
   const [outcomeType, setOutcomeType] = useState<"played" | "forfeit">("played");
+
+  // Inline validation state
+  const [winnerError, setWinnerError] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const fetchFixture = useCallback(async () => {
     if (!id || !fixtureId) return;
@@ -100,8 +105,12 @@ export default function SubmitResultScreen() {
   }
 
   async function handleSubmit() {
+    // Clear previous network/save errors on each attempt
+    setNetworkError(null);
+    setSuccessMsg(null);
+
     if (!winner) {
-      Alert.alert("Required", ERROR_SELECT_WINNER);
+      setWinnerError(ERROR_SELECT_WINNER);
       return;
     }
 
@@ -132,17 +141,15 @@ export default function SubmitResultScreen() {
 
       if (res.ok) {
         const data = await res.json();
-        Alert.alert(
-          "Submitted",
-          data.finalized ? SUCCESS_FINALIZED : SUCCESS_PENDING_CONFIRMATION,
-          [{ text: "OK", onPress: () => router.back() }]
-        );
+        setSuccessMsg(data.finalized ? SUCCESS_FINALIZED : SUCCESS_PENDING_CONFIRMATION);
+        // Navigate back after a brief moment so user sees the success message
+        setTimeout(() => router.back(), 1500);
       } else {
         const err = await res.json();
-        Alert.alert("Error", err.error || ERROR_SUBMIT_FAILED);
+        setNetworkError(err.error || ERROR_SUBMIT_FAILED);
       }
     } catch {
-      Alert.alert("Error", ERROR_NETWORK);
+      setNetworkError(ERROR_NETWORK);
     }
     setSubmitting(false);
   }
@@ -217,42 +224,57 @@ export default function SubmitResultScreen() {
 
         {/* Winner selection */}
         <Text style={{ fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 8 }}>{WINNER_SECTION_LABEL}</Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: winnerError ? 6 : 20 }}>
           <TouchableOpacity
-            onPress={() => setWinner("A")}
+            onPress={() => { setWinner("A"); setWinnerError(null); }}
             style={{
               flex: 1,
               paddingVertical: 14,
               borderRadius: 12,
               borderWidth: 2,
-              borderColor: winner === "A" ? Colors.accent : Colors.border,
+              borderColor: winnerError ? Colors.error : (winner === "A" ? Colors.accent : Colors.border),
               backgroundColor: winner === "A" ? "#fff7ed" : Colors.white,
               alignItems: "center",
             }}
             activeOpacity={0.7}
+            accessibilityLabel={`Select ${sideA || "Side A"} as winner`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: winner === "A" }}
           >
             <Text style={{ fontWeight: "700", color: winner === "A" ? Colors.accent : Colors.text, fontSize: 14 }}>
               {sideA || "Side A"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => setWinner("B")}
+            onPress={() => { setWinner("B"); setWinnerError(null); }}
             style={{
               flex: 1,
               paddingVertical: 14,
               borderRadius: 12,
               borderWidth: 2,
-              borderColor: winner === "B" ? Colors.accent : Colors.border,
+              borderColor: winnerError ? Colors.error : (winner === "B" ? Colors.accent : Colors.border),
               backgroundColor: winner === "B" ? "#fff7ed" : Colors.white,
               alignItems: "center",
             }}
             activeOpacity={0.7}
+            accessibilityLabel={`Select ${sideB || "Side B"} as winner`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: winner === "B" }}
           >
             <Text style={{ fontWeight: "700", color: winner === "B" ? Colors.accent : Colors.text, fontSize: 14 }}>
               {sideB || "Side B"}
             </Text>
           </TouchableOpacity>
         </View>
+        {winnerError && (
+          <Text
+            style={{ color: Colors.error, fontSize: 12, marginBottom: 14 }}
+            accessibilityLabel={`Winner selection error: ${winnerError}`}
+            accessibilityRole="alert"
+          >
+            {winnerError}
+          </Text>
+        )}
 
         {/* Set scores */}
         {outcomeType === "played" && (
@@ -317,19 +339,52 @@ export default function SubmitResultScreen() {
         )}
       </ScrollView>
 
+      {/* Network/save errors and success */}
+      {(networkError || successMsg) && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          {networkError && (
+            <ErrorState
+              compact
+              title="Couldn't submit result"
+              description={networkError}
+              onRetry={handleSubmit}
+              retryLabel="Try again"
+            />
+          )}
+          {successMsg && (
+            <Text
+              style={{
+                color: Colors.success,
+                fontSize: 14,
+                fontWeight: "600",
+                textAlign: "center",
+                paddingVertical: 8,
+              }}
+              accessibilityLabel={`Success: ${successMsg}`}
+              accessibilityRole="alert"
+            >
+              {successMsg}
+            </Text>
+          )}
+        </View>
+      )}
+
       {/* Submit button */}
       <View style={{ padding: 16, paddingBottom: 34, borderTopWidth: 1, borderTopColor: Colors.border }}>
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={submitting || !winner}
+          disabled={submitting || !!successMsg}
           style={{
-            backgroundColor: winner ? Colors.accent : Colors.textMuted,
+            backgroundColor: successMsg ? Colors.textMuted : Colors.accent,
             paddingVertical: 16,
             borderRadius: 999,
             alignItems: "center",
             opacity: submitting ? 0.6 : 1,
           }}
           activeOpacity={0.8}
+          accessibilityLabel={submitting ? SUBMIT_BUTTON_LOADING_LABEL : SUBMIT_BUTTON_LABEL}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: submitting || !!successMsg, busy: submitting }}
         >
           <Text style={{ color: Colors.white, fontWeight: "700", fontSize: 16 }}>
             {submitting ? SUBMIT_BUTTON_LOADING_LABEL : SUBMIT_BUTTON_LABEL}
