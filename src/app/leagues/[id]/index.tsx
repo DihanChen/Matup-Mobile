@@ -486,6 +486,7 @@ export default function LeagueDetailScreen() {
                 leagueId={id!}
                 onMemberPress={(userId) => router.push(`/users/${userId}` as never)}
                 onSessionPress={(sessionId) => router.push(`/leagues/${id}/session/${sessionId}` as never)}
+                onLogRunPress={(sessionId) => router.push(`/leagues/${id}/session/${sessionId}/log-run` as never)}
               />
             </>
           )}
@@ -652,6 +653,7 @@ function OverviewTab({
   leagueId,
   onMemberPress,
   onSessionPress,
+  onLogRunPress,
 }: {
   members: LeagueMember[];
   isOwnerOrAdmin: boolean;
@@ -661,6 +663,7 @@ function OverviewTab({
   leagueId: string;
   onMemberPress: (userId: string) => void;
   onSessionPress: (sessionId: string) => void;
+  onLogRunPress: (sessionId: string) => void;
 }) {
   return (
     <View>
@@ -739,10 +742,26 @@ function OverviewTab({
                     Your run: {formatDuration(session.my_run.elapsed_seconds)}
                   </Text>
                 )}
-                {!session.my_run && (session.status === "open" || session.status === "scheduled") && (
-                  <Text style={{ fontSize: 11, color: Colors.accent, marginTop: 4 }}>
-                    Tap to log your run
-                  </Text>
+                {!session.my_run && session.status !== "finalized" && (
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      onLogRunPress(session.id);
+                    }}
+                    style={{
+                      marginTop: 8,
+                      backgroundColor: Colors.accent,
+                      paddingVertical: 7,
+                      borderRadius: 999,
+                      alignItems: "center",
+                    }}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Log your run"
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: Colors.white }}>
+                      Log result
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </TouchableOpacity>
             );
